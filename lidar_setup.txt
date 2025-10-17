@@ -1,0 +1,10 @@
+ls /dev/ttyACM* /dev/ttyUSB*
+sudo chmod 666 /dev/ttyACM0
+
+source /opt/ros/humble/setup.bash
+source ~/turtlebot3_ws/install/setup.bash   
+source ~/capstone_ws/install/setup.bash    
+
+ros2 pkg list | grep urg
+
+ros2 launch urg_node urg_node_launch.py serial_port:=/dev/ttyACM0
