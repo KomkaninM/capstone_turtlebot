@@ -1,8 +1,8 @@
 
 # Multi-Machine Communication
 
-Firstly, Turtlebot and PC must connect at same ip address \
-Checking the ip\
+Firstly, Turtlebot and PC must connect at same ip address 
+Checking the ip
 
     ip -4 addr show | grep -oP 'inet \K[\d.]+/\d+'
 
