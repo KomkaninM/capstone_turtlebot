@@ -1,9 +1,0 @@
-# Both must connect at same ip adress
-
-#Check internet ip adress
-ip -4 addr show | grep -oP 'inet \K[\d.]+/\d+'
-
-#Then paste these on both turtlebot and your pc
-export ROS_DOMAIN_ID=30
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-export ROS_LOCALHOST_ONLY=0
