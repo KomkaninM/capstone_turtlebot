@@ -1,4 +1,3 @@
-
 # Multi-Machine Communication
 
 Firstly, Turtlebot and PC must connect at same ip address \
