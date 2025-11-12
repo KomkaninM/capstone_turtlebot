@@ -20,8 +20,6 @@ This step configures and verifies that your 2D LiDAR is connected and working pr
 
     ```bash
     ls /dev/ttyACM* 
-    sudo chmod 666 /dev/ttyACM0
-    sudo chmod 666 /dev/ttyACM1
     ```
 
 2. **Check that LiDAR-related ROS packages are installed:**
@@ -40,12 +38,12 @@ This step configures and verifies that your 2D LiDAR is connected and working pr
 3. **Launch the LiDAR driver:**
 
     ```bash
-    ros2 launch urg_node2 urg_node2.launch
+    ros2 launch urg_node2 urg_node2.launch.py
     ```
 
 4. **If you get an error**, try specifying the exact port:
     ```bash
-    ros2 launch urg_node2 urg_node2.launch serial_port:="/dev/ttyACM1"
+    ros2 launch urg_node2 urg_node2.launch.py serial_port:="/dev/ttyACM1"
     ```
 
 > ✅ **Check:** You should see laser scan data being published to `/scan`.
@@ -117,6 +115,7 @@ This launches the TurtleBot3 base and motor controllers.
 
     ```bash
     export TURTLEBOT3_MODEL=burger
+    sudo chmod 666 /dev/ttyACM1
     ros2 launch turtlebot3_bringup robot.launch.py
     ```
 
