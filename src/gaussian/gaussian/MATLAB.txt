@@ -1,0 +1,48 @@
+disp('start')
+
+% --- User Variables ---
+angles = scans_data{1, :};
+total_frame = size(scans_data, 1);
+data_point = size(angles, 2);
+
+% --- Tracking Parameters ---
+mu_idx = 50;   % Start the "magnet" at INDEX 50
+sigma = 5;    % Width of magnet in INDICES
+gaussian_divider = 5;
+
+D = zeros(total_frame, 1);
+x_indices = 1:data_point; % Create a simple 1..N list for the Gaussian
+
+for i = 1:total_frame
+    scan = scans_data{i, :};
+
+    % 1. Filter the scan
+    filter_s = sgolayfilt(scan, 2, 11);
+
+    % 2. Gaussian "magnet" (Now consistently using INDICES)
+    % It uses 'mu_idx' which we update every loop
+    y = (1 / (sigma * sqrt(2 * pi))) * exp(-((x_indices - mu_idx).^2) / (2 * sigma.^2))/gaussian_divider;
+
+    % 3. Apply the magnet
+    z = filter_s - y;
+
+    % 4. Find peaks
+    % IMPORTANT: We REMOVED 'angles' from here so it returns the INDEX (locs_idx)
+    [pks, locs_idx] = findpeaks(-z, 'MinPeakProminence', 0.001, ...
+                                'SortStr', 'descend', 'NPeaks', 1);
+
+    % 5. Update tracker
+    if ~isempty(locs_idx) & abs(mu_idx - locs_idx(1)) <= 9 
+        mu_idx = locs_idx(1);      % Update magnet to the new INDEX
+        D(i) = angles(mu_idx);     % Save the actual ANGLE for your results
+    else
+        D(i) = NaN;                % No peak found this frame
+    end
+end
+
+figure()
+plot(D)
+title('Tracked Angle over Time')
+ylabel('Angle (rad)')
+xlabel('Frame')
+best_angle = D;
