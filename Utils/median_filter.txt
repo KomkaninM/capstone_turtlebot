@@ -1,6 +1,4 @@
 function detect_weld_median(csv_file)
-    % DETECT_WELD_MEDIAN Detects weld center using Median Filter Subtraction
-    % Usage: detect_weld_median('PID_02_Good.csv')
     % 1. Load Data
     try
         data = readmatrix(csv_file);
@@ -8,113 +6,160 @@ function detect_weld_median(csv_file)
         error('Error reading file: %s', ME.message);
     end
 
-    % Get dimensions
     [num_rows, num_cols] = size(data);
     
-    % --- PARAMETERS (Tune these!) ---
-    % Savitzky-Golay smoothing parameters
+    % --- PARAMETERS ---
     sg_order = 3;
-    sg_framelen = 15; % Must be odd
-    
-    % Median filter window (Background estimation)
-    % Must be wider than the weld (e.g., 2x-3x weld width)
+    sg_framelen = 15; 
     med_window = 51; 
     
-    % Peak finding parameters
-    min_prominence = 0.001; % 1mm prominence
-    min_width = 2;          % Min width in data points
-    max_width = 50;         % Max width (reject broad walls)
+    min_prominence = 0.001; 
+    min_width = 2;          
+    max_width = 50; 
     
-    plot_freq = 1;
+    % NEW PARAMETER: Minimum Peak Height
+    % Peaks lower than this (e.g., < 0.01) are treated as noise
+    min_height_threshold = 0.0075; 
+    
+    plot_freq = 1; 
+    
+    % --- TRACKING VARIABLES ---
+    last_idx = -1;
+    missed_count = 0;     
+    reset_threshold = 5;  
 
-    % Loop through each row (scan)
-    for i = 1:num_rows
+    % Start loop
+    for i = 2:num_rows
         
         raw_signal = data(i, :);
         
-        % Filter out NaNs or Infs
-        if any(isnan(raw_signal)) || any(isinf(raw_signal))
+        % Basic validation
+        if any(isnan(raw_signal)) || any(isinf(raw_signal)) || length(raw_signal) < 50
              continue; 
         end
-        
-        if length(raw_signal) < 50
-            continue;
-        end
 
-        % --- STEP 1: PRE-PROCESSING (Smoothing) ---
-        % Removes high-frequency jitter
+        % --- PROCESSING ---
         smooth_signal = sgolayfilt(raw_signal, sg_order, sg_framelen);
-
-        % --- STEP 2: BACKGROUND ESTIMATION ---
-        % Median filter to estimate the "swing"
         background = medfilt1(smooth_signal, med_window, 'truncate');
-
-        % --- STEP 3: SUBTRACTION ---
-        % Invert: Weld is usually "closer" (smaller range), so background > signal.
-        % Subtracting background - signal makes the weld a positive peak.
         flattened_signal = background - smooth_signal;
 
-        % --- STEP 4: PEAK FINDING ---
+        % Note: pks = Peak Heights, p = Prominences
         [pks, locs, w, p] = findpeaks(flattened_signal, ...
             'MinPeakProminence', min_prominence, ...
             'MinPeakWidth', min_width);
 
-        % --- STEP 5: SELECTION & VALIDATION ---
-        
+        % --- SELECTION ---
         found_weld = false;
-        best_peak_idx = -1;
-        best_prominence = -1;
-        
+        best_peak_idx = NaN;
+        best_prominence = 0;
+        debug_loc = NaN; 
+
         if ~isempty(pks)
-            % Filter peaks by width constraint manually if needed, 
-            % though MinPeakWidth handles the lower bound.
-            % Let's find the most prominent one that fits our width criteria.
-            
+            % 1. Sort by prominence (Biggest first)
             [sorted_prominences, sort_idx] = sort(p, 'descend');
             
-            for k = 1:length(sorted_prominences)
+            % 2. Determine how many to check (Max 2)
+            num_candidates = min(length(sort_idx), 2);
+            
+            % 3. Loop through the top candidates
+            for k = 1:num_candidates
                 idx = sort_idx(k);
-                width = w(idx);
                 
-                if width <= max_width
-                    % Found a valid peak!
-                    best_peak_idx = locs(idx);
-                    best_prominence = p(idx);
-                    best_width = width;
+                current_loc = locs(idx); 
+                current_width = w(idx);
+                current_prom = p(idx);
+                current_height = pks(idx); % Get the actual height
+                
+                debug_loc = current_loc; 
+
+                % 4. Validation Logic
+                
+                % A. Check Distance (Tracking)
+                if last_idx == -1
+                    loc_valid = true; 
+                else
+                    loc_valid = is_valid_weld(current_loc, last_idx);
+                end
+                
+                % B. Check Height (The new requirement)
+                % height_valid = (current_height >= min_height_threshold);
+                
+                % 5. Final Decision
+                if current_width <= max_width && loc_valid
+                    % SUCCESS!
                     found_weld = true;
-                    break; % Stop after finding the best valid one
+                    best_peak_idx = current_loc;
+                    best_prominence = current_prom;
+                    best_width = current_width;
+                    
+                    last_idx = current_loc; 
+                    missed_count = 0; 
+                    break; % Stop looking
                 end
             end
         end
-        
-        % --- OUTPUT & VISUALIZATION ---
-        if found_weld
-            fprintf('Row %d: Weld Found at index %d. Height: %.4f, Width: %.1f\n', ...
-                i, best_peak_idx, best_prominence, best_width);
-            
-            % Plot
-            if mod(i, plot_freq) == 0 % Plot every 10th row
-                figure(1); clf;
-                subplot(2,1,1);
-                plot(raw_signal, 'Color', [0.7 0.7 0.7], 'DisplayName', 'Raw'); hold on;
-                plot(smooth_signal, 'b', 'LineWidth', 1, 'DisplayName', 'Smoothed');
-                plot(background, 'r--', 'LineWidth', 0.5, 'DisplayName', 'Background (Median)');
-                legend('Location', 'southoutside', 'Orientation', 'horizontal','NumColumns', 3); 
-                title(sprintf('Scan %d: Raw & Background', i)); grid on;
 
-                subplot(2,1,2);
-                plot(flattened_signal, 'k', 'LineWidth', 1.5, 'DisplayName', 'Flattened Signal'); hold on;
-                plot(best_peak_idx, flattened_signal(best_peak_idx), 'ro', 'MarkerSize', 8, 'LineWidth', 2, 'DisplayName', 'Detected Weld');
-                yline(min_prominence, 'g--', 'Threshold');
-                legend('Location', 'southoutside', 'Orientation', 'horizontal','NumColumns', 3); 
-                title(sprintf('Scan %d: Flattened & Detection', i)); grid on;
-                pause(0.01); % Pause to view
+
+        % --- RESET LOGIC ---
+        if ~found_weld
+            missed_count = missed_count + 1;
+            fprintf('Row %d: No valid weld. Last Checked Idx: %d. Height: %.4f (Miss: %d/%d)\n', ...
+                i, debug_loc,pks(sort_idx(1)), missed_count, reset_threshold);
+            
+            if missed_count >= reset_threshold
+                fprintf('*** Resetting Tracking State at Row %d ***\n', i);
+                last_idx = -1;  
+                missed_count = 0; 
+            end
+        else
+            fprintf('Row %d: Weld Found at index %d. Height: %.4f\n', i, best_peak_idx, pks(sort_idx(1)));
+        end
+
+
+        % --- VISUALIZATION ---
+        if mod(i, plot_freq) == 0 
+            figure(1); clf;
+            
+            % Subplot 1: Raw Data
+            subplot(2,1,1);
+            plot(raw_signal, 'Color', [0.7 0.7 0.7], 'DisplayName', 'Raw'); hold on;
+            plot(smooth_signal, 'b', 'LineWidth', 1, 'DisplayName', 'Smoothed');
+            plot(background, 'r--', 'LineWidth', 0.5, 'DisplayName', 'Background');
+            legend('Location', 'southoutside', 'Orientation', 'horizontal'); 
+            title(sprintf('Scan %d: Signal Processing', i)); grid on;
+
+            % Subplot 2: Detection
+            subplot(2,1,2);
+            plot(flattened_signal, 'k', 'LineWidth', 1.5, 'DisplayName', 'Flattened'); hold on;
+            ylim([-0.02 0.03])
+            % Plot the Min Height Threshold line (Cyan)
+            yline(min_height_threshold, 'c--', 'Min Height', 'LabelHorizontalAlignment', 'left');
+            
+            if found_weld
+                plot(best_peak_idx, flattened_signal(best_peak_idx), 'ro', ...
+                    'MarkerSize', 8, 'LineWidth', 2, 'DisplayName', 'Detected Weld');
+                title(sprintf('Scan %d: WELD DETECTED (Idx: %d)', i, best_peak_idx));
+            else
+                title(sprintf('Scan %d: SEARCHING... (Misses: %d)', i, missed_count));
             end
             
-        else
-            fprintf('Row %d: NO WELD FOUND\n', i);
+            legend('Location', 'southoutside', 'Orientation', 'horizontal'); 
+            grid on;
+            drawnow;
+            pause(0.001); 
         end
     end
 end
 
-detect_weld_median("PID_02_Good.csv")
+% Helper function
+function valid = is_valid_weld(current_ang, past_ang)
+    if abs(current_ang - past_ang) < 5 
+        valid = true;
+    else
+        if past_ang == -1
+            valid = true;
+        else
+            valid = false;
+        end
+    end
+end
