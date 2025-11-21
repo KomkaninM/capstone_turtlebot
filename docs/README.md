@@ -128,3 +128,8 @@ This launches the TurtleBot3 base and motor controllers.
 > ✅ **Check:** When successful, you should hear a startup sound and see log messages like  
 > `[turtlebot3_ros-3] [INFO] [diff_drive_controller]: Init Odometry`
 > `[turtlebot3_ros-3] [INFO] [diff_drive_controller]: Run!`
+
+3. **For Testing with Teleop:**
+   ```bash
+     ros2 run turtlebot3_teleop teleop_keyboard
+   ```
