@@ -41,9 +41,9 @@ This step configures and verifies that your 2D LiDAR is connected and working pr
     ros2 launch urg_node2 urg_node2.launch.py
     ```
 
-4. **If you get an error**, try specifying the exact port:
+4. **If you get an error**, try editing serial_port and launch again:
     ```bash
-    ros2 launch urg_node2 urg_node2.launch.py serial_port:="/dev/ttyACM1"
+    nano ~/capstone_ws/src/urg_node2/config/params_serial.yaml
     ```
 
 > ✅ **Check:** You should see laser scan data being published to `/scan`.
@@ -119,14 +119,10 @@ This launches the TurtleBot3 base and motor controllers.
     ros2 launch turtlebot3_bringup robot.launch.py
     ```
 
-2. **If you see errors or the motors don’t move, update OpenCR firmware:**
+2. **If you see errors or the motors don’t move, click RESET on OpenCR and edit usb_port:**
 
     ```bash
-    cd ./opencr_update 
-    export OPENCR_PORT=/dev/ttyACM0  # Check your port
-    export OPENCR_MODEL=burger
-    rm -rf ./opencr_update.tar.bz2 
-    ./update.sh $OPENCR_PORT $OPENCR_MODEL.opencr
+      nano ~/turtlebot3_ws/src/turtlebot3/turtlebot3_bringup/launch/robot.launch.py 
     ```
 
 > ✅ **Check:** When successful, you should hear a startup sound and see log messages like  
