@@ -131,5 +131,6 @@ This launches the TurtleBot3 base and motor controllers.
 
 3. **For Testing with Teleop:**
    ```bash
+     export TURTLEBOT3_MODEL=burger
      ros2 run turtlebot3_teleop teleop_keyboard
    ```
